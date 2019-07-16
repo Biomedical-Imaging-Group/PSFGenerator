@@ -1,8 +1,9 @@
-# PSFGenerator
-A Java software package to generate realistic 3D microscope Point-Spread Function (PSF)
+PSFGenerator
+============
 
-> *Written by Hagai Kirshner and Daniel Sage, Biomedical Imaging Group at EPFL.*
-> *11 July 2019*
+[**A Java software package to generate realistic 3D microscope Point-Spread Function (PSF)**](http://bigwww.epfl.ch/algorithms/psfgenerator/)
+
+_Written by Hagai Kirshner and Daniel Sage at the Biomedical Image Group (BIG), EPFL, Switzerland_
 
 ## Outline
 PSF Generator is a Java software package that allows one to generate and visualize various 3D models of a microscope PSF. The current version has more than fifteen different models:
@@ -12,8 +13,8 @@ PSF Generator is a Java software package that allows one to generate and visuali
 
 PSF Generator is provided for several environments: as ImageJ/Fiji plugin, as an Icy plugin, and as a Java standalone application. The program requires only few parameters which are readily-available for microscopy practitioners. Our Java implementation achieves fast execution times, as it is based on multi-threading the computational tasks and on a numerical method that adapts to the oscillatory nature of the required integrands. Potential applications are 3D deconvolution, 3D particle localization and tracking, and extended depth of field estimation to name a few.
 
-## Referencea
+## References
 
-* H. Kirshner, F. Aguet, D. Sage, M. Unser, 3-D PSF Fitting for Fluorescence Microscopy: Implementation and Localization Application, Journal of Microscopy, vol. 249, 2013.
-* A. Griffa, N. Garin and D. Sage, Comparison of Deconvolution Software in 3D Microscopy. A User Point of View, Part I and Part II, G.I.T. Imaging & Microscopy, vol 1, 2010.
-* D. Sage, L. Donati, F. Soulez, D. Fortun, G. Schmit, A. Seitz, R. Guiet, C. Vonesch, M. Unser, "DeconvolutionLab2: An Open-Source Software for Deconvolution Microscopy," Methods—Image Processing for Biologists, vol. 115, 2017.
+* H. Kirshner, F. Aguet, D. Sage, M. Unser [3-D PSF Fitting for Fluorescence Microscopy: Implementation and Localization Application](http://bigwww.epfl.ch/publications/kirshner1301.html) Journal of Microscopy, 2013.
+* A. Griffa, N. Garin and D. Sage, [Comparison of Deconvolution Software in 3D Microscopy. A User Point of View](http://bigwww.epfl.ch/publications/griffa1001.html), G.I.T. Imaging & Microscopy, 2010.
+* D. Sage, L. Donati, F. Soulez, D. Fortun, G. Schmit, A. Seitz, R. Guiet, C. Vonesch, M. Unser [DeconvolutionLab2: An Open-Source Software for Deconvolution Microscopy](http://bigwww.epfl.ch/publications/sage1701.html) Methods—Image Processing for Biologists, 2017.

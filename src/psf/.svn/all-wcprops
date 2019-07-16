@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/psfgenerator/!svn/ver/32/PSFGenerator/src/psf
+END
+DefocussingPSF.java
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/DefocussingPSF.java
+END
+GaussianPSF.java
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/GaussianPSF.java
+END
+KoehlerPSF.java
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/KoehlerPSF.java
+END
+MainDialog.java
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/psfgenerator/!svn/ver/32/PSFGenerator/src/psf/MainDialog.java
+END

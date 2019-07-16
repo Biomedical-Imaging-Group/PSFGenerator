@@ -1,0 +1,415 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Author: 
+// Daniel Sage
+// Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf;
+
+import ij.IJ;
+import ij.ImageJ;
+import ij.ImagePlus;
+import ij.plugin.BrowserLauncher;
+import ij.process.ImageProcessor;
+
+import java.awt.Frame;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+import java.net.URL;
+import java.util.Timer;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JEditorPane;
+import javax.swing.JLabel;
+import javax.swing.JSpinner;
+import javax.swing.JTabbedPane;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
+
+import psf.bw.BornWolfPSF;
+import psf.gl.GibsonLanniPSF;
+import psf.mgl.ModifiedGLPSF;
+import psf.rw.RichardsWolfPSF;
+import psf.utils.PSF;
+import additionaluserinterface.GridPanel;
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerInteger;
+import additionaluserinterface.WalkBar;
+
+/**
+ * This class is the ImageJ plugin for creating a PSF.
+ *
+ * @author Daniel Sage, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL).
+ */
+public class MainDialog extends JDialog implements ActionListener, WindowListener, HyperlinkListener, ChangeListener, Runnable {
+
+	private static double PERCENT_SATURATE = 0.05;
+	
+	private Settings settings	= new Settings("PSFGenerator", IJ.getDirectory("plugins") + "PSFGenerator.txt");
+	private Thread thread		= null;
+	private WalkBar walk		= new WalkBar("(c) 2012 EPFL, BIG", true, false, true);
+
+	private JButton bnRun		= new JButton("Generate PSF");
+	private JButton bnReset		= new JButton("Default values");
+	private JLabel lblAccuracy	= new JLabel("Accuracy");
+	private SpinnerInteger spnNX	= new SpinnerInteger(256, 1, 9999, 1);
+	private SpinnerInteger spnNY	= new SpinnerInteger(256, 1, 9999, 1);
+	private SpinnerInteger spnNZ	= new SpinnerInteger(32, 1, 9999, 1);
+	private JComboBox cmbNorm 	= new JComboBox(new String[] {"Max=1, 32 bits", "Max=255, 8-bits", "Max=65356, 16 bits"});
+	private JComboBox cmbLUT  	= new JComboBox(new String[] {"Fire", "Spectrum", "Grays", "Green"});
+	private JComboBox cmbScale  	= new JComboBox(new String[] {"Linear scale", "Log scale", "Square-root scale", "Decibel (dB)"});
+	private JComboBox cmbExtra  	= new JComboBox(new String[] {"Stat. table", "Orthogonal view", "None"});
+	static JComboBox cmbAccuracy 	= new JComboBox(new String[] { "Good (fastest)", "Very good", "Best (slowest)"});
+	private JTabbedPane tabbedPane;
+	private int tabSelected = 0;
+	private PSF psfs[];
+	
+	/**
+	* Constructor.
+	*/
+	public MainDialog() {
+		super(new Frame(), "PSF Generator");
+		psfs = new PSF[6];
+		psfs[0] = new RichardsWolfPSF();
+		psfs[1] = new GibsonLanniPSF();
+		psfs[2] = new ModifiedGLPSF();
+		psfs[3] = new BornWolfPSF();
+		//psfs[3] = new KoehlerPSF();
+		psfs[4] = new DefocussingPSF();
+		psfs[5] = new GaussianPSF();
+		
+		walk.fillAbout(
+			"PSF Generator", 
+			"Version 13.07.2012", 
+			"An ImageJ plugin to generate 3D microscope Point-Spread Function (PSF)", 
+			"Hagai Kirshner and Daniel Sage", 
+			"Biomedical Imaging Group (BIG)<br>Ecole Polytechnique F&eacute;d&eacute;rale de Lausanne (EPFL)<br>Lausanne, Switzerland",
+			"27 December 2012",
+			"http://bigwww.epfl.ch/algorithms/psfgenerator/");
+
+		for(int i=0; i<psfs.length; i++)
+			psfs[i].recordSettings(settings);
+			settings.record("spnNX",		spnNX,		"256");
+			settings.record("spnNY",		spnNY,		"256");
+			settings.record("spnNZ",		spnNZ,		"65");
+			settings.record("cmbNorm",		cmbNorm,	"Max=1, 32 bits");
+			settings.record("cmbLUT",		cmbLUT,		"Special PSF");
+			settings.record("cmbScale",		cmbScale,	"Linear");
+			settings.record("cmbExtra",		cmbExtra, 	"Orthogonal view");
+			settings.record("cmbAccuracy",  cmbAccuracy, "Good");
+			settings.loadRecordedItems();
+			tabSelected = settings.loadValue("tabSelected", 0);
+			doDialog();
+	}
+
+	/**
+	* Build the dialog box.
+	*/
+	private void doDialog() {
+
+		// Width of the nx,ny,nz text fields
+		((JSpinner.DefaultEditor)spnNX.getEditor()).getTextField().setColumns(3);
+		((JSpinner.DefaultEditor)spnNY.getEditor()).getTextField().setColumns(3);
+		((JSpinner.DefaultEditor)spnNZ.getEditor()).getTextField().setColumns(3);
+
+		// The Tabbed Pane
+		tabbedPane = new JTabbedPane();
+		tabbedPane.setTabLayoutPolicy(JTabbedPane.WRAP_TAB_LAYOUT);
+		for(int i=0; i<psfs.length; i++) {
+			int lines = psfs[i].getNumberBlankLines();
+			JEditorPane desc = getHTMLFormattedDescription(psfs[i].name, psfs[i].getLink(), psfs[i].getDescription(), lines);
+			desc.addHyperlinkListener(this);
+			GridPanel panel = new GridPanel(false, 0);
+ 			panel.place(0, 0, desc);
+ 			panel.place(1, 0, psfs[i].getParametersPanel());
+			tabbedPane.addTab(psfs[i].getShortName(), null, panel, psfs[i].getName() + " PSF model");
+		}
+		
+   		// The "output" pane
+		GridPanel pn = new GridPanel("Output", 2);
+		pn.place(1, 0, new JLabel("Size NX/NY/NZ"));
+		pn.place(1, 1, spnNX);
+		pn.place(1, 2, spnNY);
+		pn.place(1, 3, spnNZ);
+	 	
+		pn.place(2, 0, 1, 1, new JLabel("Norm/Type"));
+		pn.place(2, 1, 3, 1, cmbNorm);
+		pn.place(3, 0, 1, 1, new JLabel("Intensity"));
+		pn.place(3, 1, 3, 1, cmbScale);
+		pn.place(4, 0, 1, 1, new JLabel("Color map"));
+		pn.place(4, 1, 3, 1, cmbLUT);
+		pn.place(5, 0, 1, 1, new JLabel("Extra"));
+		pn.place(5, 1, 3, 1, cmbExtra);
+		pn.place(6, 0, 1, 1, lblAccuracy);
+		pn.place(6, 1, 3, 1, cmbAccuracy);
+		pn.place(7, 1, 3, 1, bnRun);
+
+		// The "reset" button
+		GridToolbar pnReset = new GridToolbar(false, 0);
+		pnReset.place(0, 0, bnReset);
+
+		// The main panel
+		GridPanel pnMain = new GridPanel(false, 5);
+		pnMain.place(0, 0, 2, 1, tabbedPane);
+		pnMain.place(2, 0, 2, 1, pn);
+		pnMain.place(4, 0, pnReset);
+		pnMain.place(4, 1, walk);
+	
+						
+		// Building the main JPanel
+		add(pnMain);
+		setResizable(true);
+		pack();
+		ImageJ imagej = IJ.getInstance();
+		Point loc = imagej.getLocation();
+		this.setLocation(loc.x, loc.y+75);
+		tabbedPane.setSelectedIndex(tabSelected);
+		setVisible(true);
+		
+		// Add Listeners
+		walk.getButtonClose().addActionListener(this);
+		bnRun.addActionListener(this);
+		bnReset.addActionListener(this);
+		tabbedPane.addChangeListener(this);
+		addWindowListener(this);
+		
+		// Initiate stateChanged event for the tabbedpane for updating the Accuracy combo box
+		int index = tabbedPane.getSelectedIndex();
+		tabbedPane.setSelectedIndex(0);
+		tabbedPane.setSelectedIndex(index);
+	}
+
+	/**
+	 * 
+	 */
+	public JEditorPane getHTMLFormattedDescription(String name, String link, String text, int nbLines) {
+		String html = "";
+        html += "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2//EN\">\n";
+        html += "<html><head>\n";
+        html += "<style>body {margin:4px; padding:1px;}</style>\n";
+        html += "<style>h1 {font-family:verdana arial; font-weight:bold; font-size:1em; color:#222222; margin:0px;}</style>\n";
+        html += "<style>p {font-family:verdana arial; font-size:0.9em;margin:0px;padding:0px}</style>\n";
+        html += "</head>\n";
+        html += "<body>\n";
+        html += "<h1 style=\"text-align:center\">" + name + "</h1>";
+        html += "<p style=\"text-align:center\">" + text + "</p>";
+        html += "<p style=\"text-align:center\"><a href=\"" + link + "\">Complete documentation</a></p>";
+        for(int i=0; i<nbLines; i++)
+        	html += "<p>&nbsp;</p>";
+        html += "</body></html>\n";
+		JEditorPane pane = new JEditorPane();
+		pane.setBorder(BorderFactory.createEtchedBorder());
+		pane.setEditable(false);
+		pane.setContentType("text/html; charset=ISO-8859-1");
+		pane.setText(html.toString());
+		return pane;
+	}
+
+	/**
+	* Implements the method for the HyperlinkEvent.
+	 */
+	public void hyperlinkUpdate(HyperlinkEvent e) {
+		if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+			URL url = e.getURL();
+			try {
+				BrowserLauncher.openURL(url.toString());
+			} 
+			catch(Exception ex) {
+				IJ.error("Impossible to open a browser at: " + url.toString());
+			}
+		}
+	}
+	
+	/**
+	* Implements the methods for the WindowListener.
+	*/
+	public void windowActivated(WindowEvent e) 		{}
+	public void windowClosed(WindowEvent e) 		{}
+	public void windowDeactivated(WindowEvent e) 	{}
+	public void windowDeiconified(WindowEvent e)	{}
+	public void windowIconified(WindowEvent e)		{}
+	public void windowOpened(WindowEvent e)			{}			
+	public void windowClosing(WindowEvent e) 		{ 
+		dispose();
+	}
+	
+	/**
+	* Implements the methods for the stateChanged of the tabbed pane.
+	*/	
+	public void stateChanged(ChangeEvent e) {
+		
+		JTabbedPane pane = (JTabbedPane)e.getSource();
+		int sel = pane.getSelectedIndex();
+        
+		if (sel < 3) { // R&W, B&W, G&L tabs
+			cmbAccuracy.setEnabled(true);
+			lblAccuracy.setEnabled(true);
+		}
+		else {			// Other tabs
+			cmbAccuracy.setEnabled(false);
+			lblAccuracy.setEnabled(false);
+		}
+	}
+	
+	/**
+	* Implements the actionPerformed for the ActionListener.
+	*/
+	public synchronized  void actionPerformed(ActionEvent e) {
+		
+		if (e.getActionCommand().equals("Close")) {
+			settings.storeRecordedItems();
+			settings.storeValue("tabSelected", tabbedPane.getSelectedIndex());
+			dispose();
+		}
+		else if (e.getSource() == bnReset) {
+			int index = tabbedPane.getSelectedIndex();
+			psfs[index].resetParameters();
+		}
+		else if (e.getSource() == bnRun) {
+			if (thread == null) {
+				thread = new Thread(this);
+				thread.setPriority(Thread.MIN_PRIORITY);
+				thread.start();
+			}
+		}
+		notify();
+	}
+	
+	/**
+	* Implements the actionPerformed for the Runnable.
+	*/
+	public void run() {
+		
+		walk.reset();
+		bnRun.setEnabled(false);
+		
+		// Creating the required psf class
+		PSF psf;
+		int index = tabbedPane.getSelectedIndex();
+		if (index == 0) 	psf = new RichardsWolfPSF();
+		else if (index == 1) 	psf = new GibsonLanniPSF();
+		else if (index == 2)	psf = new ModifiedGLPSF();
+		else if (index == 3) 	psf = new BornWolfPSF();
+		//else if (index == 3) 	psf = new KoehlerPSF();
+		else if (index == 4)	psf = new DefocussingPSF();
+		else 			psf = new GaussianPSF();
+		
+		// Reading and validating the z-stack parameters
+		int nx = spnNX.get();
+		int ny = spnNY.get();
+		int nz = spnNZ.get();
+		int accuracy = cmbAccuracy.getSelectedIndex();
+		String errorSize = psf.checkSize(nx, ny, nz);
+		if (errorSize != "") {
+			walk.reset();
+			bnRun.setEnabled(true);
+			IJ.error(errorSize);			
+			thread = null;
+			return;
+		}
+		
+		// psf parameters
+		psf.setProgressBar(walk);
+		psf.readParameters();
+		psf.allocate(nx, ny, nz);
+		psf.setAccuracy(accuracy);
+				
+		// Timer for the progress bar
+		Timer timer = new Timer();
+		timer.schedule(psf, 0, 300);
+		
+		// computing the psf z-stack
+		psf.generate();
+
+		// Histogram calculation before modifying the z-stack data
+		int[] histo = psf.getHistogram();
+		
+		// Modifying the data based on the Intensity combo box
+		psf.rescale(cmbScale.getSelectedIndex());
+		
+		// Normalizing pixel values according to the Normalization combo box
+		ImagePlus imp = psf.createImagePlus(cmbNorm.getSelectedIndex());
+		
+		// displaying a table of statistics if required 
+		if (cmbExtra.getSelectedIndex() == 0) psf.showStatistics();
+		
+		// Displaying the image
+		imp.show();
+		while(!imp.isVisible());
+		imp.setSlice(nz/2);
+		
+		// Applying the required LUT
+		try  {
+			IJ.run((String)cmbLUT.getSelectedItem());
+		}
+		catch(Exception e) {
+			IJ.log("Plugin LUT " + (String)cmbLUT.getSelectedItem() + " not found.");
+		}
+		
+		// Allowing for little saturation for improving the z-stack display
+		saturateLUT(imp, histo, nx*ny*nz, psf.getPSF().getMaximum(), PERCENT_SATURATE);
+		
+		// Apply orthogonal views if required
+		if (cmbExtra.getSelectedIndex() == 1) {
+			try {
+				IJ.run("Orthogonal Views");
+			}
+			catch(Exception e) {
+				IJ.log("Orthogonal views plugin is not found.");
+			}
+		}
+		
+		// Updating the GUI
+		timer.cancel();
+		bnRun.setEnabled(true);
+		walk.finish("Finished " + psf.shortName);
+		
+		thread = null;
+	}
+	
+	/**
+	 * Set the min and max for the display.
+	 */
+	private void saturateLUT(ImagePlus imp, int[] histo, int size, double max, double percentSaturate) {
+		int cumul = 0;
+		int h = 0;
+		for(h=histo.length-1; h>0; h--) {
+			cumul += histo[h];
+			if (cumul > percentSaturate*size) break;
+		}
+		double saturateLevel = (max * h) / histo.length;
+		int nz = imp.getImageStackSize();
+		ImageProcessor ip = imp.getStack().getProcessor(nz/2);
+		ip.setMinAndMax(0, saturateLevel);
+		imp.updateAndDraw();
+	}
+
+}
+

@@ -1,0 +1,216 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf.bw;
+
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import psf.utils.PSF;
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerDouble;
+
+/**
+ * This class generates the Born and Wolf PSF.
+ * 
+ * @author Hagai Kirshner and Daniel Sage, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL).
+ */
+
+public class BornWolfPSF extends PSF {
+    
+	static private double NA_Default = 1.4;
+	static private double ni_Default = 1.5;
+	static private double lambda_Default = 500;
+	static private double lateralResolution_Default = 150; //deltar_Default
+	static private double axialResolution_Default = 250; //delaz_Default
+	   
+    static private SpinnerDouble spnNA = new SpinnerDouble(NA_Default, 0, 3, 0.1);
+    static private SpinnerDouble spnNI = new SpinnerDouble(ni_Default, 0, 3, 0.1);
+    static private SpinnerDouble spnLateral = new SpinnerDouble(lateralResolution_Default, 0, 100000, 1);
+    static private SpinnerDouble spnAxial  = new SpinnerDouble(axialResolution_Default, 0, 100000, 1);
+    static private SpinnerDouble spnLambda = new SpinnerDouble(lambda_Default, 200, 1200, 10);
+    
+    protected BornWolfParameters p;
+	BornWolf[] gb;
+   
+	/**
+	* Constructor.
+	*/
+	public BornWolfPSF() {
+		super();
+		name = "Born and Wolf";
+		shortName = "B&W";
+		p = new BornWolfParameters();
+	}
+	
+	/**
+	* Set the parameters of this PSF.
+	*/
+	public void setParameters(double ni, double NA, double lambda, double lateralResolution, double axialResolution) {
+		p.ni = ni;
+		p.NA = NA;
+		p.lambda = lambda;
+		p.lateralResolution = lateralResolution;
+		p.axialResolution = axialResolution;
+	}
+	
+	/**
+	 * Returns the radial resolution.
+	 */
+	public double getRadialResolution() {
+		return p.lateralResolution;
+	}
+
+	/**
+	 * Returns the axial resolution.
+	 */
+	public double getAxialResolution() {
+		return p.axialResolution;
+	}
+
+	/**
+	* Reset the parameters as default.
+	*/
+	public void resetParameters() {
+		spnNA.set(NA_Default);
+		spnNI.set(ni_Default);
+		spnLateral.set(lateralResolution_Default);
+		spnAxial.set(axialResolution_Default);
+		spnLambda.set(lambda_Default);
+	}
+	
+	/**
+	 * Returns the number of blank lines in the description.
+	 */
+	public int getNumberBlankLines() {
+		return 3;
+	}
+	
+	/**
+	 * Check the size.
+	 */
+	public String checkSize(int nx, int ny, int nz) {
+		if (nz < 3) return ("nz should be greater than 3.");
+		if (nx < 4) return ("nz should be greater than 4.");
+		if (ny < 4) return ("nz should be greater than 4.");
+		return "";
+	}
+
+	/** 
+	 * Read the parameters for the user interface	
+	 */
+	public void readParameters() {
+		p.ni = spnNI.get();
+		p.NA = spnNA.get();
+		p.lambda =spnLambda.get()*1e-9;
+		p.lateralResolution = spnLateral.get()*1E-9;
+		p.axialResolution = spnAxial.get()*1E-9;
+	}
+	
+	/**
+	 * Build the panel for the user parameters.
+	 */
+	public JPanel getParametersPanel() {		
+		GridToolbar pn = new GridToolbar(false);
+		pn.place(01, 0, new JLabel("<html>Numerical Aperture</html>"));
+		pn.place(02, 0, new JLabel("<html>Refractive Index immersion</html>"));
+		pn.place(03, 0, new JLabel("<html>Wavelength &lambda;</html>"));
+		pn.place(04, 0, new JLabel("<html>Pixel size</html>"));
+		pn.place(05, 0, new JLabel("<html>Z-step spacing</html>"));
+		pn.place(01, 1, spnNA);
+		pn.place(02, 1, spnNI);
+		pn.place(03, 1, spnLambda);
+		pn.place(04, 1, spnLateral);
+		pn.place(05, 1, spnAxial);
+		pn.place(01, 2, new JLabel("<html>NA</html>"));
+		pn.place(02, 2, new JLabel("<html>n</html>"));
+		pn.place(03, 2, new JLabel("<html>[nm]</html>"));
+		pn.place(04, 2, new JLabel("<html>[nm]</html>"));		
+		pn.place(05, 2, new JLabel("<html>[nm]</html>"));
+		JPanel panel = new JPanel();
+		panel.add(pn);
+		return panel;
+	}
+	
+	/**
+	 * getDescription()
+	 */
+	public String getDescription() {
+		String desc = "";
+		desc += "This model describes the scalar-based <br>";
+		desc += "diffraction that occurs in the microscope<br>";
+		desc += "when the particle is in focus <br>";
+		desc += "The imaging plan need not be in focus.";
+		return desc;
+	}
+	
+	/**
+	 * getLink.
+	 */
+	public String getLink() {
+  		return "http://bigwww.epfl.ch/algorithms/psfgenerator/#bw";
+	}
+
+	
+	/**
+	 * Record the parameters in the settings file
+	 */
+	public void recordSettings(Settings settings) {
+		settings.record(name + "spnNA",		spnNA,		"" + NA_Default);
+		settings.record(name + "spnNI",		spnNI,		"" + ni_Default);
+		settings.record(name + "spnLateral",	spnLateral,	"" + lateralResolution_Default);
+		settings.record(name + "spnAxial",	spnAxial,	"" + axialResolution_Default);
+		settings.record(name + "spnLambda",	spnLambda,	"" + lambda_Default);	
+	}
+			
+	/**
+	* Create the 3D PSF z-stack.
+	*/
+	public void generate() {
+	    		
+		BornWolf gb[] = new BornWolf[nz];
+		
+		for (int z=0; z<nz; z++) {
+		    p.defocus = p.axialResolution*(z - (nz-1.0)/2.0);
+			//gb[z] = new BornWolf(p, nx, ny, psf, z, accuracy);
+		    gb[z] = new BornWolf(this,z);			
+		}
+		
+		// Threading the slices
+		boolean multithread = true;
+		if (multithread) {
+			ExecutorService executor = Executors.newFixedThreadPool(nz);
+			for(int z=0; z<nz; z++) executor.execute(gb[z]);
+			executor.shutdown();
+			while (!executor.isTerminated()) {}
+		}
+		else for(int z=0; z<nz; z++) gb[z].run();
+		
+		unitary();
+		walk.finish();
+	}       
+}

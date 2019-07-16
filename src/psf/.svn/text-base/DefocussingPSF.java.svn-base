@@ -1,0 +1,246 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf;
+
+import imageware.Builder;
+import imageware.ImageWare;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import psf.utils.FFT;
+import psf.utils.FourierSpace;
+import psf.utils.PSF;
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerDouble;
+
+/**
+ * This class generates a simple microscope PSF which simualtes a defocussing.
+ *
+ * @author Daniel Sage, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL)
+ */
+
+public class DefocussingPSF extends PSF {
+
+	static private double zi_Default = 2000;
+	static private double K_Default = 275;
+	static private double dTop_Default = 30;
+	static private double dMid_Default = 1;
+	static private double dBot_Default = 30;
+	
+	private double zi = zi_Default;
+	private double K = K_Default;
+	private double dTop = dTop_Default;
+	private double dMid = dMid_Default;
+	private double dBot = dBot_Default;
+	
+	static private SpinnerDouble spnZI		= new SpinnerDouble(zi_Default, 0, 10000, 1);
+	static private SpinnerDouble spnK		= new SpinnerDouble(K_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDTop	= new SpinnerDouble(dTop_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDMid	= new SpinnerDouble(dMid_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDBot	= new SpinnerDouble(dBot_Default, 0, 10000, 1);
+	
+	/**
+	* Constructor.
+	*/
+	public DefocussingPSF() {
+		super();
+		shortName = "Defocus";
+		name = "Defocusing function";
+	}
+	
+	/**
+	 * Check the size.
+	 */
+	public String checkSize(int nx, int ny, int nz) {
+		if (nz < 3)
+			return ("nz should be greater than 3.");
+		int mx = 1;
+		while (mx < nx)
+			mx *= 2;
+		if (mx != nx)
+			return ("nx should be a power of 2.");
+		int my = 1;
+		while (my < ny)
+			my *= 2;
+		if (my != ny)
+			return ("ny should be a power of 2.");
+		return "";
+	}
+	
+	/**
+	* Set the parameters of this PSF.
+	*/
+	public void setParameters(double zi, double K, double dTop, double dMid, double dBot) {
+		this.zi = zi;
+		this.K = K;
+		this.dTop = dTop;
+		this.dMid = dMid;
+		this.dBot = dBot;
+	}
+	
+	/**
+	* Reset the parameters as default.
+	*/
+	public void resetParameters() {
+		spnZI.set(zi_Default);
+		spnK.set(K_Default);
+		spnDTop.set(dTop_Default);
+		spnDMid.set(dMid_Default);
+		spnDBot.set(dBot_Default);
+	}
+	
+	/**
+	 * Returns the number of blank lines in the description.
+	 */
+	public int getNumberBlankLines() {
+		return 0;
+	}
+	
+	/** 
+	 * Read the parameters for the user interface	
+	 */
+	public void readParameters() {
+		this.zi = spnZI.get();
+		this.K = spnK.get();
+		this.dTop = spnDTop.get();
+		this.dMid = spnDMid.get();
+		this.dBot = spnDBot.get();
+	}
+	
+	/**
+	 * Build the panel for the user parameters.
+	 */
+	public JPanel getParametersPanel() {		
+		GridToolbar pn = new GridToolbar(false, 1);
+		pn.place(01, 0, new JLabel("<html>z<sub>i</sub></html>"));
+		pn.place(02, 0, new JLabel("<html>K (x 10<sup>-6</sup>)</html>"));
+		pn.place(03, 0, new JLabel("<html>Out-of-focus - top</html>"));
+		pn.place(04, 0, new JLabel("<html>Out-of-focus - middle</html>"));
+		pn.place(05, 0, new JLabel("<html>Out-of-focus - bottom</html>"));
+		pn.place(01, 1, spnZI);
+		pn.place(02, 1, spnK);
+		pn.place(03, 1, spnDTop);
+		pn.place(04, 1, spnDMid);
+		pn.place(05, 1, spnDBot);
+		pn.place(01, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(02, 2, new JLabel(""));
+		pn.place(03, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(04, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(05, 2, new JLabel("<html>[&mu;m]</html>"));
+		JPanel panel = new JPanel();
+		panel.add(pn);
+		return panel;
+	}
+
+	/**
+	 * 
+	 */
+	public String getDescription() {
+		String html = "";
+		html += "<p>Simulate the defocussing of a microscope lens.</p>";
+		html += "<p>It is defined by its optical transfer function in</p>";
+		html += "<p>the Fourier domain: OTF(&omega;) = exp(-&omega;<sup>2</sup>&sigma;<sup>2</sup>).&#124;sin(&xi)/&xi&#124;</p>";
+		html += "<p>where &xi; = (d.&omega;.(1-&omega;)) / (K.(z<sub>i</sub>-d) and &sigma; = sqrt(3)</p>";
+		html += "<p>d is the defocusing distance</p>";
+		return html;
+	}
+	
+	/**
+	 * getLink.
+	 */
+	public String getLink() {
+  		return "http://bigwww.epfl.ch/algorithms/psfgenerator/#d";
+	}
+	
+	/**
+	 * Record the parameters in the settings file
+	 */
+	public void recordSettings(Settings settings) {
+		settings.record(name + "spnZI", spnZI, "" + zi_Default);
+		settings.record(name + "spnK", spnK, "" + K_Default);
+		settings.record(name + "spnDTop", spnDTop, "" + dTop_Default);
+		settings.record(name + "spnDMid", spnDMid, "" + dMid_Default);
+		settings.record(name + "spnDBot", spnDBot, "" + dBot_Default);
+	}
+
+	/**
+	* Create the 3D PSF.
+	*/
+	public void generate() {
+		int n = nz/2;
+		double d = dMid;
+		for(int z=0; z<nz; z++) {
+			progress = (z+1)*100.0/nz;
+			if (z < n) {
+				double r = (n-z) / (double)n;
+				d = dMid * (1.0-r) + dTop * r;
+			}
+			if (z == n)
+				d = dMid;
+			if (z > n){
+				double r = (z-n) / (double)n;
+				d = dMid * (1.0-r) + dBot * r;
+			}
+			ImageWare slice = create(d);
+			FFT.shift(slice);
+			psf.putXY(0, 0, z, slice);
+		}
+	}
+	
+	/**
+	* Create one slice of the PSF at the specified distance d.
+	*/
+	private ImageWare create(double d) {
+		double d_um = d * 1e-6;
+		double zi_um = zi* 1e-6;
+		double K_um = K * 1e-6;
+		if (d_um == zi_um)
+			return Builder.create(nx, ny, 1, ImageWare.FLOAT);
+		
+		double wm = (d_um/(zi_um-d_um)) / K_um;
+		double sigma = Math.sqrt(3);
+		int xsize = nx/2;
+		int ysize = ny/2;
+		double s, sinc;
+		double function[][] = new double[xsize+1][ysize+1];
+		double wx, wy, wr;
+		for (int y=0; y<=xsize; y++)
+		for (int x=0; x<=xsize; x++) {
+			wx = Math.PI * x / xsize;
+			wy = Math.PI * y / ysize;
+			wr = Math.sqrt(wx*wx + wy*wy);
+			s = wm * wr * (1.0- wr);
+			if (s==0.0)
+				sinc = 1.0;
+			else
+				sinc = Math.sin(s) / s;
+			if (sinc < 0)
+				sinc = -sinc;
+			function[x][y] = Math.exp(-sigma*sigma*wr*wr) * sinc;
+		}
+		FourierSpace G = new FourierSpace(function);
+		return G.inverse();
+	}
+}

@@ -1,0 +1,57 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf.rw;
+
+
+
+/**
+ * This class manages all parameters of the Gibson-Lanni model.
+ * 
+ * @author Hagai Kirshner, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL)
+ */
+
+public class RichardsWolfParameters {
+
+	public double lateralResolution;
+	public double axialResolution;
+	public double NA;
+	public double ni;
+	public double defocus;
+	public double lambda;
+	
+	RichardsWolfParameters() {}
+	RichardsWolfParameters(RichardsWolfParameters p) {
+		this.lateralResolution = p.lateralResolution;
+		this.axialResolution = p.axialResolution;
+		this.NA = p.NA;
+		this.ni = p.ni;
+		this.defocus = p.defocus;
+		this.lambda = p.lambda;
+	}
+	
+	/*public void calculateConstants() {
+		alpha = Math.asin(NA);
+		k = 2*Math.PI/lambda;
+		kni = k*ni;
+	}*/
+}

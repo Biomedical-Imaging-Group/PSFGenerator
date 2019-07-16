@@ -1,0 +1,228 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+
+package psf.gl;
+
+import ij.IJ;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import psf.utils.PSF;
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerDouble;
+
+/**
+ * This class generates the Gibson-Lanni PSF.
+ * 
+ * @author Hagai Kirshner, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL)
+ */
+public class GibsonLanniPSF extends PSF {
+    
+	static private double NA_Default = 1.4;
+	static private double ni_Default = 1.5;
+	static private double ns_Default = 1.33;
+	static private double ti_Default = 150;
+	static private double lambda_Default = 500;
+	static private double pixelsize_Default = 250;
+	static private double zpos_Default = 2000;
+	static private double axialResolution_Default = 500;
+	
+	/*private double NA = NA_Default;
+	private double ni = ni_Default;
+	private double ns = ns_Default;
+	private double ti = ti_Default;
+	private double lambda = lambda_Default;
+	private double pixelsize = pixelsize_Default;
+	private double zpos = zpos_Default;
+	private double axialResolution = axialResolution_Default;
+	*/
+
+	static private SpinnerDouble spnNA			= new SpinnerDouble(NA_Default, 0, 3, 0.1);
+	static private SpinnerDouble spnNI			= new SpinnerDouble(ni_Default, 0, 3, 0.1);
+	static private SpinnerDouble spnNS			= new SpinnerDouble(ns_Default, 0, 3, 0.1);
+	static private SpinnerDouble spnTI			= new SpinnerDouble(ti_Default, 0, 9999.0, 100);
+	static private SpinnerDouble spnLambda		= new SpinnerDouble(lambda_Default, 200, 1200, 10);
+	static private SpinnerDouble spnPixelSize	= new SpinnerDouble(pixelsize_Default, 1, 9999, 10);
+	static private SpinnerDouble spnZPos		= new SpinnerDouble(zpos_Default, -999999.0, 999999.0, 10);
+	static private SpinnerDouble spnAxial		= new SpinnerDouble(axialResolution_Default, 1, 9999.0, 10);
+	
+	protected GibsonLanniParameters p;
+	GibsonLanni[] gb;
+	   
+	/**
+	* Constructor.
+	*/
+	public GibsonLanniPSF() {
+		super();
+		name = "Gibson and Lanni";
+		shortName = "G&L";
+		p = new GibsonLanniParameters();
+	}
+ 
+	/**
+	* Reset the parameters as default.
+	*/
+	public void resetParameters() {
+		spnNA.set(NA_Default);
+		spnNI.set(ni_Default);
+		spnNS.set(ns_Default);
+		spnTI.set(ti_Default);
+		spnLambda.set(lambda_Default);
+		spnPixelSize.set(pixelsize_Default);
+		spnZPos.set(zpos_Default);
+		spnAxial.set(axialResolution_Default);
+	}
+	
+	/** 
+	 * Read the parameters for the user interface	
+	 */
+	public void readParameters() {
+		p.ni = spnNI.get();
+		p.NA = spnNA.get();
+ 		p.ns = spnNS.get();
+		p.ti0 = spnTI.get()*1E-6;
+		p.lambda = spnLambda.get()*1E-9;
+		p.pixelSize = spnPixelSize.get()*1E-9;
+		p.particleAxialPosition = spnZPos.get()*1E-9;
+		p.axialResolution = spnAxial.get()*1E-9;
+	}
+
+	/**
+	 * Build the panel for the user parameters.
+	 */ 
+	public JPanel getParametersPanel() {		
+		GridToolbar pn = new GridToolbar(false, 1);
+		pn.place(01, 0, new JLabel("Numerical Aperture"));
+		pn.place(02, 0, new JLabel("Refractive Index Immersion"));
+		pn.place(03, 0, new JLabel("Refractive Index Sample"));
+		pn.place(04, 0, new JLabel("Working distance (ti)"));
+		pn.place(05, 0, new JLabel("Wavelength"));
+		pn.place(06, 0, new JLabel("Pixel size"));
+		pn.place(11, 0, new JLabel("Particle position Z"));
+		pn.place(12, 0, new JLabel("Z-step spacing"));
+		pn.place(01, 1, spnNA);
+		pn.place(02, 1, spnNI);
+		pn.place(03, 1, spnNS);
+		pn.place(04, 1, spnTI);
+		pn.place(05, 1, spnLambda);
+		pn.place(06, 1, spnPixelSize);
+		pn.place(11, 1, spnZPos);
+		pn.place(12, 1, spnAxial);
+		pn.place(01, 2, new JLabel("NA"));
+		pn.place(02, 2, new JLabel("<html>n<sub>i</sub></html>"));
+		pn.place(03, 2, new JLabel("<html>n<sub>s</sub></html>"));
+		pn.place(04, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(05, 2, new JLabel("<html>[nm]</html>"));		
+		pn.place(06, 2, new JLabel("<html>[nm]</html>"));
+		pn.place(11, 2, new JLabel("<html>[nm]</html>"));		
+		pn.place(12, 2, new JLabel("<html>[nm]</html>"));		
+		JPanel panel = new JPanel();
+		panel.add(pn);
+		return panel;
+	}
+	
+	/**
+	 * Record the parameters in the settings file
+	 */
+	public void recordSettings(Settings settings) {
+		settings.record(name + "spnNA",		spnNA, "" + NA_Default);
+		settings.record(name + "spnNI",		spnNI, "" + ni_Default);
+		settings.record(name + "spnNS",		spnNS, "" + ns_Default);
+		settings.record(name + "spnTI",		spnTI, "" + ti_Default);
+		settings.record(name + "spnLambda",	spnLambda, "" + lambda_Default);
+		settings.record(name + "spnPixelSize",	spnPixelSize, "" + pixelsize_Default);		
+		settings.record(name + "spnZPos", 	spnZPos, "" + zpos_Default);
+		settings.record(name + "spnAxial", 	spnAxial, "" + axialResolution_Default);
+	}
+		
+	/**
+	* Create the 3D PSF.
+	*/
+	public void generate() {
+
+		double stageDisplacement;
+		gb = new GibsonLanni[nz];
+								
+		for (int z=0; z<nz; z++) {
+			stageDisplacement = p.axialResolution*(z-(nz-1.0)/2.0);
+			p.ti = p.ti0 + stageDisplacement;
+			gb[z] = new GibsonLanni(this,z);
+		}
+		
+		// Threading the slices
+		boolean multithread = true;
+		if (multithread) {
+			//ExecutorService executor = Executors.newFixedThreadPool(nz);
+			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+			for(int z=0; z<nz; z++) executor.execute(gb[z]);
+			executor.shutdown();
+			while (!executor.isTerminated()) {}
+		}
+		else for(int z=0; z<nz; z++) gb[z].run();
+		
+		unitary();
+		walk.finish();
+	}
+	
+	/**
+	 * Check the size.
+	 */
+	public String checkSize(int nx, int ny, int nz) {
+		if (nz < 3) return ("nz should be greater than 3.");
+		if (nx < 4) return ("nx should be greater than 4.");
+		if (ny < 4) return ("ny should be greater than 4.");
+		return "";
+	}
+	
+	/**
+	 * Returns the number of blank lines in the description.
+	 */
+	public int getNumberBlankLines() {
+		return 0;
+	}
+	
+	/**
+	 * getDescription()
+	 */
+	public String getDescription() {
+		String desc = "";
+		desc += "This model describes the scalar-based <br>";
+		desc += "diffraction that occurs in the microscope. <br>";
+		desc += "It accounts for the immersion, the cover-slip <br>";
+		desc += "and the sample layers.";
+		return desc;
+	}
+	
+	/**
+	 * getLink.
+	 */
+	public String getLink() {
+  		return "http://bigwww.epfl.ch/algorithms/psfgenerator/#gl";
+	}
+
+}

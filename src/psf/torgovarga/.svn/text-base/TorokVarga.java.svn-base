@@ -1,0 +1,109 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+
+package psf.tv;
+
+import imageware.Builder;
+import imageware.ImageWare;
+
+/**
+ * This class generates the Gibson-Lanni PSF.
+ * 
+ * @author Hagai Kirshner, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL)
+ */
+public class TorokVarga implements Runnable {
+    
+	static int	OVER_SAMPLING = 2;
+	
+	private TorokVargaPSF tvPSF;
+	private TorokVargaParameters p;
+	private int nx;
+	private int ny;
+	private int z;
+	private boolean running = false;
+	
+	/**
+	* Constructor.
+	*/
+	public TorokVarga(TorokVargaPSF tvPSF, int z) {
+		this.tvPSF = tvPSF;
+		this.nx = tvPSF.nx;
+		this.ny = tvPSF.ny;
+		this.z = z;
+		// making a new copy of the parameters is required, as different threads use different "ti" values.
+		this.p = new TorokVargaParameters(tvPSF.p);
+	}
+ 
+	public boolean isRunning() {
+		return running;
+	}
+	
+	/**
+	 * Creates a 2D PSF image at a specified z location.
+	 */
+	public void run() {
+		
+		running = true;
+				
+		// The center of the image in units of [pixels]
+		double x0 = (nx-1)/2.0;
+		double y0 = (ny-1)/2.0;
+
+		// Lateral particle position in units of [pixels]
+		double xp = x0;// 0.0/p.pixelSize;
+		double yp = y0;// 0.0/p.pixelSize;
+
+		// Radial locations.
+		//double xpAbs = Math.abs(xp), ypAbs = Math.abs(yp);
+		//double maxRadialDistanceInPixels = Math.round(Math.sqrt((xpAbs+nx-x0)*(xpAbs+nx-x0)+(ypAbs+ny-y0)*(ypAbs+ny-y0)))+1;
+		int maxRadius = ((int) Math.round(Math.sqrt((nx-x0)*(nx-x0)+(ny-y0)*(ny-y0))))+1;
+		double[] r = new double[maxRadius*OVER_SAMPLING];
+		double[] h = new double[r.length];
+		
+		KirchhoffDiffractionSimpson I = new KirchhoffDiffractionSimpson(p,tvPSF.accuracy);
+		//KirchhoffDiffraction I = new KirchhoffDiffraction(p,accuracy);
+		for (int n=0; n<r.length; n++) {
+			r[n] = ((double)n)/((double)OVER_SAMPLING);
+			h[n] = I.calculate(r[n]*p.pixelSize);
+			tvPSF.progress = tvPSF.progress + 1.0/(r.length+1);
+		}
+				
+		// Linear interpolation of the pixels values
+		ImageWare slice = Builder.create(nx, ny, 1, ImageWare.FLOAT);
+		double rPixel, value;
+		int index;
+		for (int x=0; x<nx; x++)
+			for (int y=0; y<ny; y++) {
+				rPixel = Math.sqrt((x-xp)*(x-xp)+(y-yp)*(y-yp));								// radius of the current pixel in units of [pixels]
+				index = (int) Math.floor(rPixel*OVER_SAMPLING);									// Index of nearest coordinate from bellow
+				value = h[index] + (h[index+1]-h[index])*(rPixel-r[index])*OVER_SAMPLING ;		// Interpolated value.	
+				slice.putPixel(x, y, 0, value);
+			}
+
+		tvPSF.getPSF().putXY(0, 0, z, slice);
+		
+		tvPSF.progress = tvPSF.progress + 1.0/(r.length+1); // progress = 1
+		
+		running = false;
+	}
+}

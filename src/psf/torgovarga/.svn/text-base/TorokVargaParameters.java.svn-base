@@ -1,0 +1,108 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf.tv;
+
+
+
+/**
+ * This class manages all parameters of the Gibson-Lanni model.
+ * 
+ * @author Hagai Kirshner, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL)
+ */
+
+public class TorokVargaParameters {
+
+	/** Working distance of the objective (design value). This is also the width of the immersion layer.*/
+	public double  ti0;	
+	
+	/** Working distance of the objective (experimental value). influenced by the stage displacement.*/
+	public double ti;		
+	
+	/** Immersion medium refractive index (design value).*/
+	public double ni0;
+	
+	/** Immersion medium refractive index (experimental value).*/
+	public double ni;
+	
+	/** Coverslip thickness (design value).*/
+	public double tg0 = 0.0;
+	
+	/** Coverslip thickness (experimental value).*/
+	public double tg = 0.0;		
+	
+	/** Coverslip refractive index (design value).*/
+	public double ng0 = 1.5;
+	
+	/** Coverslip refractive index (experimental value).*/
+	public double ng  = 1.5;
+	
+	/** Sample refractive index.*/
+	public double ns;
+	
+	/** Emission wavelength of the fluorophoes.*/
+	public double lambda; 	
+	
+	/** Numerical aperture (assumed to be normalized by ni0) */
+	public double NA;		
+
+	/** Effective size of a single pixels (physical size diveded by the magnification).*/
+	public double pixelSize;
+	
+	/** Effective size of a single stage displacement.*/
+	public double axialResolution;
+
+	/** Axial position of the particle.*/
+	public double particleAxialPosition;
+	
+	/* Constants */
+	public double alpha;	// aperture in [radians] 
+	public double k;		// wave number
+	public double kni;
+	
+	TorokVargaParameters() {}
+	TorokVargaParameters(TorokVargaParameters p) {
+		this.NA = p.NA;
+		this.ng = p.ng;
+		this.ng0 = p.ng0;
+		this.ni = p.ni;
+		this.ni0 = p.ni0;
+		this.ns = p.ns;
+		this.particleAxialPosition = p.particleAxialPosition;
+		this.pixelSize = p.pixelSize;
+		this.tg = p.tg;
+		this.tg0 = p.tg0;
+		this.ti = p.ti;
+		this.ti0 = p.ti0;
+		this.lambda = p.lambda;
+		this.axialResolution = p.axialResolution;
+		this.alpha = p.alpha;
+		this.k = p.k;
+		this.kni = p.kni;
+	}
+	
+	public void calculateConstants() {
+		alpha = Math.asin(NA);
+		k = 2*Math.PI/lambda;
+		kni = k*ni;
+	}
+}

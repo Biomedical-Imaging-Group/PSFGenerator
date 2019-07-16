@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/psfgenerator/!svn/ver/32/PSFGenerator/src/psf/gl
+END
+KirchhoffDiffractionRiemann.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/gl/KirchhoffDiffractionRiemann.java
+END
+GibsonLanniParameters.java
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/gl/GibsonLanniParameters.java
+END
+KirchhoffDiffractionSimpson.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/psfgenerator/!svn/ver/32/PSFGenerator/src/psf/gl/KirchhoffDiffractionSimpson.java
+END
+GibsonLanni.java
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/psfgenerator/!svn/ver/29/PSFGenerator/src/psf/gl/GibsonLanni.java
+END
+GibsonLanniPSF.java
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/psfgenerator/!svn/ver/32/PSFGenerator/src/psf/gl/GibsonLanniPSF.java
+END

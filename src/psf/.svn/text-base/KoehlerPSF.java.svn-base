@@ -1,0 +1,223 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+
+package psf;
+
+import imageware.ImageWare;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerDouble;
+
+import psf.utils.*;
+
+/**
+ * This class generates Koehler PSF.
+ *
+ * @author Daniel Sage, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL).
+ */
+public class KoehlerPSF extends PSF {
+
+	static private double dTop_Default = 6;
+	static private double dMid_Default = 3;
+	static private double dBot_Default = 6;
+	static private double n0_Default = 1.5;
+	static private double n1_Default = 1.0;
+	
+	private double dTop = dTop_Default;
+	private double dMid = dMid_Default;
+	private double dBot = dBot_Default;
+	private double n0 = n0_Default;
+	private double n1 = n1_Default;
+	
+	static private SpinnerDouble spnN0		= new SpinnerDouble(n0_Default, 0, 10000, 1);
+	static private SpinnerDouble spnN1		= new SpinnerDouble(n1_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDTop	= new SpinnerDouble(dTop_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDMid	= new SpinnerDouble(dMid_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDBot	= new SpinnerDouble(dBot_Default, 0, 10000, 1);
+	
+	/**
+	* Constructor.
+	*/
+	public KoehlerPSF() {
+		super();
+		shortName = "Koheler";
+		name = "<html>K&ouml;hler Illumination<html>";
+	}
+
+	/**
+	* Reset the parameters as default.
+	*/
+	public void resetParameters() {
+		spnN0.set(n0_Default);
+		spnN1.set(n1_Default);
+		spnDTop.set(dTop_Default);
+		spnDMid.set(dMid_Default);
+		spnDBot.set(dBot_Default);
+	}
+
+	/**
+	 * Returns the number of blank lines in the description.
+	 */
+	public int getNumberBlankLines() {
+		return 0;
+	}
+
+	/**
+	 * Check the size.
+	 */
+	public String checkSize(int nx, int ny, int nz) {
+		if (nz < 3) return ("nz should be greater than 3.");
+		
+		int mx = 1;
+		while (mx < nx) mx *= 2;
+		if (mx != nx) return ("nx should be a power of 2.");
+		int my = 1;
+		while (my < ny) my *= 2;
+		if (my != ny) return ("ny should be a power of 2.");
+		return "";
+	}
+
+	/** 
+	 * Read the parameters for the user interface	
+	 */
+	public void readParameters() {
+		this.n0 = spnN0.get();
+		this.n1 = spnN1.get();
+		this.dTop = spnDTop.get();
+		this.dMid = spnDMid.get();
+		this.dBot = spnDBot.get();
+	}
+	
+	/**
+	 * Build the panel for the user parameters.
+	 */
+	
+	public JPanel getParametersPanel() {		
+		GridToolbar pn = new GridToolbar(false, 1);
+		pn.place(01, 0, new JLabel("<html>Refractive index &nu;<sub>0</sub></html>"));
+		pn.place(02, 0, new JLabel("<html>Refractive index &nu;<sub>1</sub></html>"));
+		pn.place(03, 0, new JLabel("<html>Out-of-focus - top</html>"));
+		pn.place(04, 0, new JLabel("<html>Out-of-focus - middle</html>"));
+		pn.place(05, 0, new JLabel("<html>Out-of-focus - bottom</html>"));
+		pn.place(01, 1, spnN0);
+		pn.place(02, 1, spnN1);
+		pn.place(03, 1, spnDTop);
+		pn.place(04, 1, spnDMid);
+		pn.place(05, 1, spnDBot);
+		pn.place(01, 2, new JLabel(""));
+		pn.place(02, 2, new JLabel(""));
+		pn.place(03, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(04, 2, new JLabel("<html>[&mu;m]</html>"));
+		pn.place(05, 2, new JLabel("<html>[&mu;m]</html>"));
+		JPanel panel = new JPanel();
+		panel.add(pn);
+		return panel;
+	}
+	
+	/**
+	 * 
+	 */
+	public String getDescription() {
+		String desc = "";
+		desc += "<p>Simulates a defocussing effect due to the K&ouml;hler </p>";
+		desc += "<p>illumination in a brightfield microscope. The</p>";
+		desc += "<p>optical transfer function in the Fourier domain is</p>";
+		desc += "<p>OTF(&omega;) = exp(-&omega;<sup>2</sup>&sigma;<sup>2</sup>/2),</p>";
+		desc += "<p>where &sigma; = &nu;<sub>0</sub> + &nu;<sub>1</sub>.(d+z)</p>";
+		return desc;
+	}
+	
+	/**
+	 * getLink.
+	 */
+	public String getLink() {
+  		return "http://bigwww.epfl.ch/algorithms/psfgenerator/#k";
+	}
+
+	
+	/**
+	 * Record the parameters in the settings file
+	 */
+	public void recordSettings(Settings settings) {
+		settings.record(name + "spnN0", spnN0, "" + n0_Default);
+		settings.record(name + "spnN1", spnN1, "" + n1_Default);
+		settings.record(name + "spnDTop", spnDTop, "" + dTop_Default);
+		settings.record(name + "spnDMid", spnDMid, "" + dMid_Default);
+		settings.record(name + "spnDBot", spnDBot, "" + dBot_Default);
+	}
+	
+	/**
+	 * 
+	 */
+	public double getProgressInformation() {
+		return progress;
+	}
+	
+	/**
+	* Create the 3D PSF.
+	*/
+	public void generate() {
+		double z0 = (nz-1)/2.0;
+		double d = 0;
+		for(int z=0; z<nz; z++) {
+			progress = (z+1)*100.0/nz;
+			if (z < z0) {
+				double r = (z0-z) / z0;
+				d = dMid * (1.0-r) + dTop * r;
+			}
+			if (z >= z0){
+				double r = (z-z0) / z0;
+				d = dMid * (1.0-r) + dBot * r;
+			}
+			ImageWare slice = create(d+z);
+			FFT.shift(slice);
+			psf.putXY(0, 0, z, slice);
+		}
+		unitary();
+	}
+	
+	/**
+	* Create one slice of the PSF.
+	*/
+	private ImageWare create(double d) {
+		double sigma = n0 + n1 * Math.abs(d);
+		int xsize = nx/2;
+		int ysize = ny/2;
+		double ampl = 1.0; //1.0/(2.0*Math.PI*sigma*sigma);
+		double function[][] = new double[xsize+1][ysize+1];
+		double wx, wy, wr;
+		for (int y=0; y<=ysize; y++)
+		for (int x=0; x<=xsize; x++) {
+			wx = Math.PI * x / xsize;
+			wy = Math.PI * y / ysize;
+			wr = Math.sqrt(wx*wx + wy*wy);
+			function[x][y] = ampl*Math.exp(-wr*wr*sigma*sigma/2.0);
+		}
+		FourierSpace G = new FourierSpace(function);
+		return G.inverse();
+	}
+}

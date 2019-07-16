@@ -1,0 +1,162 @@
+//=====================================================================================
+// Project: PSF Generator
+// 
+// Organization: Biomedical Imaging Group (BIG)
+// Ecole Polytechnique Federale de Lausanne (EPFL)
+// Lausanne, Switzerland
+//
+// Information: http://bigwww.epfl.ch/deconvolution/
+//
+// Reference:
+// Alessandra Griffa, Nathalie Garin, Daniel Sage, 
+// Comparison of Deconvolution Software in 3D Microscopy: A User Point of View
+// G.I.T. Imaging & Microscopy, vol. 12, no. 1, pp. 43-45, March 2010.
+// Available: http://bigwww.epfl.ch/publications/griffa1001.html
+//
+// Conditions of use:
+// You'll be free to use this software for research purposes, but you
+// should not redistribute it without our consent. In addition, we 
+// expect you to include a citation or acknowledgment whenever 
+// you present or publish results that are based on it.
+//=====================================================================================
+
+package psf;
+
+import imageware.Builder;
+import imageware.ImageWare;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import psf.utils.PSF;
+import additionaluserinterface.GridToolbar;
+import additionaluserinterface.Settings;
+import additionaluserinterface.SpinnerDouble;
+
+/**
+ * This class generates Gaussian PSF.
+ *
+ * @author Daniel Sage, Biomedical Imaging Group, Ecole Polytechnique Federale de Lausanne (EPFL).
+ */
+public class GaussianPSF extends PSF {
+
+	static private double sigmaFocus_Default = 2;
+	static private double sigmaDefocus_Default = 10;
+	private double sigmaFocus = sigmaFocus_Default;;
+	private double sigmaDefocus = sigmaDefocus_Default;
+	static private SpinnerDouble spnFocus	= new SpinnerDouble(sigmaFocus_Default, 0, 10000, 1);
+	static private SpinnerDouble spnDefocus	= new SpinnerDouble(sigmaDefocus_Default, 0, 10000, 1);
+		
+	/**
+	* Constructor.
+	*/
+	public GaussianPSF() {
+		super();
+		name = "Gaussian function";
+		shortName = "Gauss";
+	}
+	
+	/**
+	 * Check the size.
+	 */
+	public String checkSize(int nx, int ny, int nz) {
+		if (nz < 3) return ("nz should be greater than 3.");
+		if (nx < 4) return ("nx should be greater than 4.");
+		if (ny < 4) return ("ny should be greater than 4.");
+		return "";
+	}
+
+	/**
+	* Reset the parameters as default.
+	*/
+	public void resetParameters() {
+		spnFocus.set(sigmaFocus_Default);
+		spnDefocus.set(sigmaDefocus_Default);
+	}
+	
+	/**
+	 * Returns the number of blank lines in the description.
+	 */
+	public int getNumberBlankLines() {
+		return 2;
+	}
+		
+	/** 
+	 * Read the parameters for the user interface	
+	 */
+	public void readParameters() {
+		this.sigmaFocus = spnFocus.get();
+		this.sigmaDefocus = spnDefocus.get();
+	}
+	
+	/**
+	 * Build the panel for the user parameters.
+	 */
+	
+	public JPanel getParametersPanel() {		
+		GridToolbar pn = new GridToolbar(false);
+		pn.place(01, 0, new JLabel("<html>&sigma;<sub>focus</sub></html>"));
+		pn.place(02, 0, new JLabel("<html>&sigma;<sub>defocus</sub></html>"));
+		pn.place(01, 1, spnFocus);
+		pn.place(02, 1, spnDefocus);
+		JPanel panel = new JPanel();
+		panel.add(pn);
+		return panel;
+	}
+	
+	/**
+	 * 
+	 */
+	public String getDescription() {
+		String desc = "";
+		desc = "<p>Simulates a blurring effect using a 2D Gaussian function:<p>";
+		desc += "<p>G(x,y) = exp(-(x<sup>2</sup>+y<sup>2</sup>)/2&sigma;<sup>2</sup>))/&sigma;<sup>2</sup><p>";
+		desc += "<p>The value of &sigma changes linearly with z, starting with &sigma;<sub>focus</sub>.</p>";
+		desc += "<p>The final value of &sigma is &sigma;<sub>defocus</sub>.</p>";
+  		return desc;
+	}
+	
+	/**
+	 * getLink.
+	 */
+	public String getLink() {
+  		return "http://bigwww.epfl.ch/algorithms/psfgenerator/#g";
+	}
+
+	
+	/**
+	 * Record the parameters in the settings file
+	 */
+	public void recordSettings(Settings settings) {
+		settings.record(name + "spnFocus", spnFocus, "" + sigmaFocus_Default);
+		settings.record(name + "spnDefocus", spnDefocus, "" + sigmaDefocus_Default);
+	}
+	
+	/**
+	* Create the 3D PSF.
+	*/
+	public void generate() {
+		
+		// Center of the stack
+		double x0 = (nx-1)/2.0;
+		double y0 = (ny-1)/2.0;
+		double z0 = (nz-1)/2.0;
+		
+		double sigma, value;
+		ImageWare slice;
+		double delSigma = (sigmaDefocus-sigmaFocus)/z0;
+		
+		for(int z=0; z<nz; z++) {
+			slice = Builder.create(nx, ny, 1, ImageWare.FLOAT);
+			sigma = sigmaFocus +Math.abs((z-z0))*delSigma;
+			for(int y=0; y<ny;y++) {
+				for(int x=0; x<nx;x++) {
+					value = Math.exp(-((x-x0)*(x-x0)+(y-y0)*(y-y0))/(2*sigma*sigma))/(sigma*sigma);	
+					slice.putPixel(x, y, 0, value);
+				}
+			}
+			psf.putXY(0, 0, z, slice);	
+			progress = (z+1)*100.0/nz;
+		}
+	}
+}

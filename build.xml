@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="psfgenerator" default="build" basedir=".">
+	
+	<property name="lib"	location="../lib/"/>
+    <property name="src"	location="dist/${ant.project.name}-src.zip"/>
+    <property name="cls"	location="dist/${ant.project.name}-cls.zip"/>
+    <property name="jar"	location="dist/PSF_Generator.jar"/>
+	<property name="bun"	location="dist/PSFGenerator.jar"/>
+	
+	<path id="lib.path">
+		<pathelement path="${lib}/ij.jar"/>
+		<pathelement path="${lib}/bilib-commons.jar"/>
+	</path>
+
+	<!-- Compilation and distribution in zip and jar file -->
+	<target name="build">
+		<delete dir="bin/ij" />
+		
+		<mkdir dir="bin"/>
+		<!--javac srcdir="src" destdir="bin" classpathref="lib.path"  source="1.5" target="1.5" deprecation="on" optimize="on" debug="on" / -->		
+		<copy toDir="bin/bilib/commons"><fileset dir="${lib}/bin/bilib/commons"/></copy>
+		<copy toDir="bin/plugins/sage/psfgenerator/"><fileset dir="resources/"/></copy>
+
+		<copy file="plugins.config" toDir="bin" />
+				
+		<mkdir dir="dist"/>
+		<zip destfile="${src}" basedir="src" />
+        <zip destfile="${cls}" basedir="bin" />
+		<jar destfile="${jar}" basedir="bin" />
+ 
+		<copy file="${jar}" toDir="../../ImageJ/plugins/" />
+		<copy file="${jar}" toDir="../../Fiji.app/plugins/" />
+		<copy file="${jar}" toDir="../../icy/plugins/sage/psfgenerator/" />
+		
+		<copy toDir="bin/"><fileset dir="${lib}/ij"/></copy>
+		<jar destfile="${bun}" basedir="bin" />
+
+		<copy file="${bun}" toDir="/Applications/MATLAB_R2013a.app/java/" />
+		<copy file="${bun}" toDir="/Applications/MATLAB_R2013b.app/java/" />
+		
+	</target>
+		
+    <!-- Clean classes, jar and zip -->
+    <target name="clean" description="Clean up build products">
+        <delete dir="bin"/>
+        <delete dir="dist"/>
+     </target>
+</project>
